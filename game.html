@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gridshot HD — Modes & SD (Styled UI) — Final (Replay)</title>
+<style>
+  :root{
+    --bg:#0f1720;
+    --panel:#0b1220;
+    --cell:#26303a;
+    --accent:#ef5b4a;
+    --muted:#9aa6b2;
+    --glass: rgba(255,255,255,0.03);
+    --glass-2: rgba(255,255,255,0.02);
+    --radius:12px;
+    --cell-size:100px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:var(--bg);
+    color:#e6eef6;
+    font-family: Inter, Roboto, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    align-items:center;
+    padding:18px;
+  }
+
+  /* Top bar */
+  .topbar{width:100%;max-width:1100px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+  .panel{background:var(--panel);border-radius:var(--radius);padding:12px;display:flex;gap:12px;align-items:center;box-shadow:0 4px 18px rgba(0,0,0,.6)}
+
+  /* Controls layout */
+  .controls-grid{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .control-group{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+  .control-row{display:flex;gap:8px;align-items:center}
+  label.small{font-size:12px;color:var(--muted)}
+
+  select,input[type="number"]{background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:inherit;padding:8px;border-radius:8px}
+  input[type="number"]{width:84px}
+  input[type="checkbox"]{transform:scale(1.05)}
+
+  button.btn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:8px 12px;border-radius:10px;cursor:pointer}
+  button.btn:hover{transform:translateY(-1px)}
+  button.primary{background:linear-gradient(90deg,var(--accent),#ff8b6b);border:none;color:#111;font-weight:600}
+  button.ghost{background:transparent}
+
+  /* Stats */
+  .stats{width:100%;max-width:1100px;display:flex;gap:14px;align-items:center;justify-content:flex-start}
+  .stat{background:var(--glass-2);padding:8px 12px;border-radius:10px;font-size:14px;color:var(--muted)}
+  .stat strong{color:#fff;margin-left:6px}
+
+  /* HP bar */
+  #hpWrap{width:100%;max-width:1100px}
+  #hpBg{width:100%;height:18px;background:#17202a;border-radius:10px;border:1px solid rgba(255,255,255,0.03);overflow:hidden}
+  #hpFill{height:100%;background:linear-gradient(90deg,#6bff87,#1fbf4c);width:100%;transition:width .18s linear}
+
+  /* Game area */
+  .gameArea{width:100%;flex:1;display:flex;align-items:center;justify-content:center}
+  .grid{display:grid;gap:12px;justify-content:center;align-content:center}
+  .cell{width:var(--cell-size);height:var(--cell-size);background:var(--cell);display:flex;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;position:relative;box-shadow:0 8px 20px rgba(2,6,23,.6)}
+  .cell:hover{filter:brightness(1.06)}
+  .circle{width:60%;height:60%;border-radius:50%;background:linear-gradient(180deg,#ff6161,#d93a3a);transition:opacity .3s linear}
+
+  /* Reaction float (transparent, click-through) */
+  .reaction-float{
+    position:fixed;
+    left:0;
+    top:0;
+    transform:translate(-50%,-50%);
+    padding:4px 8px;
+    font-size:13px;
+    border-radius:6px;
+    background:transparent; /* transparent so you can see the cell */
+    color:#fff;
+    pointer-events:none; /* important: allows clicking through */
+    z-index:9999;
+    white-space:nowrap;
+    opacity:0;
+    font-weight:700;
+    text-shadow:0 2px 6px rgba(0,0,0,0.8);
+    will-change:transform,opacity;
+    user-select:none;
+  }
+
+  @keyframes rtFloat{
+    from{opacity:1; transform: translate(-50%,-50%) scale(1)}
+    to{opacity:0; transform: translate(-50%,-140px) scale(.95)}
+  }
+
+  /* Leaderboard button + panel */
+  .leaderboard-btn{
+    position:fixed; left:12px; top:50%; transform:translateY(-50%);
+    width:48px; height:48px; border-radius:12px; background:var(--panel); border:1px solid rgba(255,255,255,0.04);
+    display:flex;align-items:center;justify-content:center; cursor:pointer; z-index:10010; box-shadow:0 8px 20px rgba(0,0,0,0.6);
+  }
+  .leaderboard-btn:hover{transform:translateY(-50%) scale(1.02)}
+
+  .leaderboard-panel{
+    position:fixed; left:72px; top:12%; width:320px; max-height:76vh; overflow:auto; padding:12px; border-radius:12px; background:linear-gradient(180deg,#07101a,#081018); border:1px solid rgba(255,255,255,0.03); color:var(--muted); z-index:10005; display:none;
+  }
+  .leaderboard-panel h3{margin:0 0 8px 0; color:#fff}
+  .lb-item{display:flex;gap:8px;align-items:center;width:100%;padding:8px;border-radius:8px;background:transparent;border:none;color:inherit;cursor:pointer}
+  .lb-item:hover{background:rgba(255,255,255,0.02)}
+  .lb-rank{width:28px;text-align:center;color:var(--muted)}
+  .lb-main strong{color:#fff}
+  .lb-meta{font-size:12px;color:var(--muted);margin-left:auto}
+
+  /* Result overlay and details modal */
+  #resultScreen{position:fixed;inset:0;background:rgba(2,6,23,0.8);display:none;align-items:center;justify-content:center;padding:20px;z-index:10000}
+  #resultCard{background:linear-gradient(180deg,#0b1016,#081018);padding:20px;border-radius:14px;min-width:320px;color:var(--muted); box-shadow:0 12px 40px rgba(0,0,0,0.7);} 
+  #resultCard h2{margin:0 0 8px 0;color:#fff}
+  #resultCard .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  #resultCard .result-grid div{font-size:14px}
+  #resultCard .result-score{font-size:36px;font-weight:800;color:var(--accent)}
+
+  .details-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:linear-gradient(180deg,#071018,#051018);padding:16px;border-radius:12px;z-index:10020;min-width:320px;color:var(--muted);box-shadow:0 12px 40px rgba(0,0,0,0.7)}
+  .details-modal h4{margin:0 0 8px 0;color:#fff}
+  .details-modal .close-btn{margin-top:12px}
+
+  /* Replay overlay / dot */
+  .replay-overlay{position:fixed;inset:0;z-index:10030;display:block}
+  .replay-dot{position:fixed;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 8px 20px rgba(0,0,0,0.6);pointer-events:none;transform:translate(-50%,-50%);z-index:10031}
+  .replay-click{position:fixed;width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,0.9);pointer-events:none;transform:translate(-50%,-50%);z-index:10032;animation:clickFade 600ms forwards}
+  @keyframes clickFade{from{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(1.6)}}
+
+  /* responsive */
+  @media(max-width:900px){
+    :root{--cell-size:76px}
+    .topbar{flex-direction:column;align-items:stretch}
+    .stats{overflow:auto;padding:6px 0}
+    .leaderboard-panel{left:12px; right:12px; width:auto; top:8%;}
+    .leaderboard-btn{left:8px}
+  }
+</style>
+</head>
+<body>
+  <!-- Left persistent leaderboard button + panel -->
+  <button id="leaderboardBtn" class="leaderboard-btn" aria-label="Open leaderboard">🏆</button>
+  <div id="lbPanel" class="leaderboard-panel" aria-hidden="true"></div>
+
+  <div class="topbar">
+    <div class="panel controls-grid" style="flex:1">
+      <div class="control-group">
+        <label class="small">Grid size</label>
+        <select id="gridSize" aria-label="Grid size"><option value="3">3 x 3</option><option value="4">4 x 4</option><option value="5">5 x 5</option><option value="6">6 x 6</option></select>
+      </div>
+
+      <div class="control-group">
+        <label class="small">Active</label>
+        <input id="activeCount" type="number" min="1" value="3" aria-label="Active circles">
+      </div>
+
+      <div class="control-group">
+        <label class="small">HD (Hidden)</label>
+        <div class="control-row"><input id="hdMode" type="checkbox"><span style="font-size:12px;color:var(--muted);margin-left:8px">Enable</span></div>
+      </div>
+
+      <div class="control-group">
+        <label class="small">Visible (ms)</label>
+        <input id="visibleTime" type="number" min="0" value="1000">
+      </div>
+
+      <div class="control-group">
+        <label class="small">Fade (ms)</label>
+        <input id="fadeTime" type="number" min="0" value="500">
+      </div>
+
+      <!-- Reaction speed toggle added -->
+      <div class="control-group">
+        <label class="small">Reaction speed</label>
+        <div class="control-row"><input id="reactionToggle" type="checkbox" checked><span style="font-size:12px;color:var(--muted);margin-left:8px">Show</span></div>
+      </div>
+    </div>
+
+    <div class="panel" style="min-width:360px;justify-content:flex-end">
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="control-group" style="min-width:150px">
+          <label class="small">Mode</label>
+          <select id="modeSelect"><option value="unlimited">Unlimited</option><option value="timed">Timed</option><option value="sd">SD (1 miss = fail)</option></select>
+        </div>
+
+        <div class="control-group">
+          <label class="small">Time (s)</label>
+          <input id="modeTime" type="number" min="5" value="30">
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" id="applyBtn">Apply</button>
+          <button class="btn primary" id="startBtn">Start</button>
+          <button class="btn" id="stopBtn">Stop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats" role="status" aria-live="polite">
+    <div class="stat">Score: <strong id="score">0</strong></div>
+    <div class="stat">Hits: <strong id="hits">0</strong></div>
+    <div class="stat">Misses: <strong id="misses">0</strong></div>
+    <div class="stat">Accuracy: <strong id="acc">100%</strong></div>
+    <div class="stat">Combo: <strong id="combo">0</strong></div>
+    <div class="stat">Time: <strong id="timeDisplay">∞</strong></div>
+    <div class="stat">Avg RT: <strong id="avgRT">—</strong></div>
+  </div>
+
+  <div id="hpWrap"><div id="hpBg"><div id="hpFill"></div></div></div>
+
+  <div class="gameArea">
+    <div class="grid" id="grid" aria-label="Game grid"></div>
+  </div>
+
+  <div id="resultScreen" aria-hidden="true">
+    <div id="resultCard">
+      <h2 id="finalText">Game Over</h2>
+      <div id="finalStats">&nbsp;</div>
+      <div id="finalDetails" style="margin-top:10px;color:var(--muted)"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="btn primary" id="restartBtn">Restart</button>
+        <button class="btn" id="viewLeaderboardBtn">View leaderboard</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ---------------------------
+// Reaction-time config (edit these values)
+// ---------------------------
+const GOOD_RT = 200; // ms - considered "good" (green)
+const OK_RT = 400;   // ms - middle zone (yellowish)
+const BAD_RT = 700;  // ms - considered bad (deep red)
+const MAX_RT = BAD_RT; // clamping max used for color mapping
+const RT_ANIM_MS = 800; // how long the float animation lasts in ms
+// ---------------------------
+
+// --- elements ---
+const gridEl = document.getElementById('grid');
+const scoreEl = document.getElementById('score');
+const hitsEl = document.getElementById('hits');
+const missesEl = document.getElementById('misses');
+const accEl = document.getElementById('acc');
+const comboEl = document.getElementById('combo');
+const timeDisplay = document.getElementById('timeDisplay');
+const gridSizeSelect = document.getElementById('gridSize');
+const activeCountInput = document.getElementById('activeCount');
+const applyBtn = document.getElementById('applyBtn');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const respawnBtn = document.getElementById('respawnBtn');
+const resetStatsBtn = document.getElementById('resetStatsBtn');
+const hdModeCheckbox = document.getElementById('hdMode');
+const fadeTimeInput = document.getElementById('fadeTime');
+const visibleTimeInput = document.getElementById('visibleTime');
+const modeSelect = document.getElementById('modeSelect');
+const modeTimeInput = document.getElementById('modeTime');
+const hpFill = document.getElementById('hpFill');
+const resultScreen = document.getElementById('resultScreen');
+const finalText = document.getElementById('finalText');
+const finalStats = document.getElementById('finalStats');
+const finalDetails = document.getElementById('finalDetails');
+const leaderboardEl = document.getElementById('leaderboard');
+const restartBtn = document.getElementById('restartBtn');
+const reactionToggle = document.getElementById('reactionToggle');
+const avgRTEl = document.getElementById('avgRT');
+const leaderboardBtn = document.getElementById('leaderboardBtn');
+const lbPanel = document.getElementById('lbPanel');
+const viewLeaderboardBtn = document.getElementById('viewLeaderboardBtn');
+
+// --- state ---
+let gridSize = 3;
+let activeCount = 3;
+let score = 0, hits = 0, misses = 0, combo = 0, totalClicks = 0;
+let maxCombo = 0;
+let hp = 100;
+let activeCells = []; // list of indexes with circles
+let spawnTimes = {};  // { index: timestamp }
+let visibleTimers = {};
+let fadeTimers = {};
+let gameOver = false;
+let gameRunning = false;
+let mode = 'unlimited';
+let modeTime = 30;
+let remainingTime = 0;
+let timerInterval = null;
+let reactionTimes = []; // store reaction times in ms
+
+// Replay recording variables
+let mouseReplay = []; // array of {t,x,y}
+let isRecording = false;
+let recordStart = 0;
+let lastRecordTime = 0;
+const RECORD_SAMPLING_MS = 16; // sample at ~60hz
+let gameEvents = []; // array of {t,type,...}
+let clickEvents = []; // array of {t,index,hit}
+
+// Sounds (public short assets)
+const popSound = new Audio('hit.mp3');
+const comboBreakSound = new Audio('ms.mp3');
+
+// --- helpers ---
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+function clearTimersForIndex(i){ if(visibleTimers[i]){ clearTimeout(visibleTimers[i]); delete visibleTimers[i]; } if(fadeTimers[i]){ clearTimeout(fadeTimers[i]); delete fadeTimers[i]; } }
+function clearAllTimers(){ Object.keys(visibleTimers).forEach(k=>clearTimersForIndex(k)); }
+
+function getAvgRT(){ if(!reactionTimes || reactionTimes.length===0) return null; return reactionTimes.reduce((a,b)=>a+b,0)/reactionTimes.length; }
+function formatAvgRT(){ const avg=getAvgRT(); return avg===null? '—' : Math.round(avg) + ' ms'; }
+function updateAvgRTDisplay(){ avgRTEl.textContent = formatAvgRT(); }
+
+function formatDate(ts){ return new Date(ts).toLocaleString(); }
+
+// map reaction time to a color from green -> yellow -> red using HSL
+function getReactionColor(rt){
+  const clamped = clamp(rt, 0, MAX_RT);
+  const ratio = clamped / MAX_RT; // 0..1
+  // hue: 120 (green) -> 60 (yellow) -> 0 (red)
+  const hue = Math.round(120 * (1 - ratio));
+  const sat = 85;
+  const light = 55;
+  return `hsl(${hue}, ${sat}%, ${light}%)`;
+}
+
+function showReactionFloatAtCell(cell, reactionMs){
+  // If visual disabled, do nothing
+  if(!reactionToggle || !reactionToggle.checked) return;
+
+  const rect = cell.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'reaction-float';
+  el.textContent = reactionMs + 'ms';
+
+  // center over the cell
+  el.style.left = (rect.left + rect.width/2) + 'px';
+  el.style.top = (rect.top + rect.height/2) + 'px';
+
+  // color based on RT (adjustable via constants above)
+  el.style.color = getReactionColor(reactionMs);
+
+  // ensure it doesn't steal clicks
+  el.style.pointerEvents = 'none';
+
+  // add to document
+  document.body.appendChild(el);
+
+  // start animation (use configured duration)
+  // force reflow so animation plays reliably
+  void el.offsetWidth;
+  el.style.animation = `rtFloat ${RT_ANIM_MS}ms cubic-bezier(.22,.8,.31,1) forwards`;
+
+  // cleanup when finished
+  el.addEventListener('animationend', ()=>{ try{ el.remove(); }catch(e){} });
+  // safety remove if something goes wrong
+  setTimeout(()=>{ if(document.body.contains(el)) el.remove(); }, RT_ANIM_MS + 200);
+}
+
+// --- replay recording: capture mouse movements while recording ---
+document.addEventListener('mousemove', (e)=>{
+  if(!isRecording || !gameRunning) return;
+  const now = Date.now();
+  if(!recordStart) return; // safety
+  if(now - lastRecordTime >= RECORD_SAMPLING_MS){
+    mouseReplay.push({ t: now - recordStart, x: e.clientX, y: e.clientY });
+    lastRecordTime = now;
+  }
+});
+
+// --- leaderboard panel + details ---
+function renderLeaderboardList(){
+  const key = 'gridshot_leaderboard_v2';
+  const list = JSON.parse(localStorage.getItem(key) || '[]');
+  lbPanel.innerHTML = '';
+  const title = document.createElement('h3'); title.textContent = 'Leaderboard'; lbPanel.appendChild(title);
+
+  if(list.length === 0){ const empty = document.createElement('div'); empty.style.color = 'var(--muted)'; empty.textContent = '(no scores yet)'; lbPanel.appendChild(empty); return; }
+
+  list.forEach((r,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'lb-item';
+    // indicate if replay available
+    const replayIndicator = (r.replay && r.replay.mouse && r.replay.mouse.length) ? '<span style="margin-left:8px;color:#fff">▶</span>' : '';
+    btn.innerHTML = `<div class="lb-rank">${i+1}</div><div class="lb-main"><strong>${r.score}</strong> pts <div class="lb-meta">${r.hits}/${r.hits + r.misses} • ${r.accuracy}%</div></div>${replayIndicator}`;
+    btn.addEventListener('click', ()=> showScoreDetails(r));
+    lbPanel.appendChild(btn);
+  });
+}
+
+function toggleLeaderboardPanel(force){
+  const isOpen = lbPanel.style.display === 'block';
+  const open = (typeof force === 'boolean') ? force : !isOpen;
+  lbPanel.style.display = open ? 'block' : 'none';
+  lbPanel.setAttribute('aria-hidden', String(!open));
+  leaderboardBtn.setAttribute('aria-expanded', String(open));
+  if(open) renderLeaderboardList();
+}
+
+function deleteScore(date){
+  const key = 'gridshot_leaderboard_v2';
+  let list = JSON.parse(localStorage.getItem(key) || '[]');
+  list = list.filter(item => Number(item.date) !== Number(date));
+  localStorage.setItem(key, JSON.stringify(list));
+  renderLeaderboardList();
+}
+
+function showScoreDetails(entry){
+  // create modal with details and histogram of reaction times if present
+  const modal = document.createElement('div');
+  modal.className = 'details-modal';
+
+  const title = document.createElement('h4');
+  title.textContent = `Score — ${entry.score} pts`;
+  modal.appendChild(title);
+
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = '1fr 1fr';
+  grid.style.gap = '8px';
+
+  const left = document.createElement('div');
+  left.innerHTML = `<div><strong>Hits:</strong> ${entry.hits}</div><div><strong>Misses:</strong> ${entry.misses}</div><div><strong>Accuracy:</strong> ${entry.accuracy}%</div>`;
+  const right = document.createElement('div');
+  right.innerHTML = `<div><strong>Max Combo:</strong> ${entry.maxCombo || 0}</div><div><strong>Mode:</strong> ${entry.mode || '—'}</div><div><strong>Duration:</strong> ${entry.duration ? entry.duration + 's' : '—'}</div>`;
+  grid.appendChild(left); grid.appendChild(right);
+  modal.appendChild(grid);
+
+  const dateLine = document.createElement('div'); dateLine.style.marginTop = '8px'; dateLine.style.color = 'var(--muted)';
+  dateLine.textContent = `Date: ${entry.date ? new Date(entry.date).toLocaleString() : '—'}`;
+  modal.appendChild(dateLine);
+
+  // reaction times chart
+  const rts = (entry.reactionTimes && entry.reactionTimes.length) ? entry.reactionTimes : [];
+  if(rts.length){
+    const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 100; canvas.style.display='block'; canvas.style.marginTop='10px';
+    modal.appendChild(canvas);
+    drawHistogram(canvas, rts);
+
+    // show a sample list (first 40)
+    const sample = document.createElement('div'); sample.style.marginTop='8px'; sample.style.fontSize='12px'; sample.style.color='var(--muted)';
+    sample.textContent = 'Sample RTs (ms): ' + rts.slice(0,40).map(v=>Math.round(v)).join(', ') + (rts.length>40? ' …':'');
+    modal.appendChild(sample);
+  } else {
+    const noData = document.createElement('div'); noData.style.marginTop='8px'; noData.style.color='var(--muted)'; noData.textContent = 'No reaction-time data saved for this run.'; modal.appendChild(noData);
+  }
+
+  // buttons: Watch Replay (if exists), Remove Score, Close
+  const btnRow = document.createElement('div'); btnRow.style.display='flex'; btnRow.style.gap='8px'; btnRow.style.marginTop='12px';
+
+  if(entry.replay && entry.replay.mouse && entry.replay.mouse.length){
+    const watchBtn = document.createElement('button'); watchBtn.className='btn primary'; watchBtn.textContent='Watch Replay';
+    watchBtn.addEventListener('click', ()=>{
+      // hide UI and modal/leaderboard
+      overlay.remove();
+      toggleLeaderboardPanel(false);
+      resultScreen.style.display = 'none';
+      playReplay(entry.replay);
+    });
+    btnRow.appendChild(watchBtn);
+  }
+
+  const removeBtn = document.createElement('button'); removeBtn.className='btn'; removeBtn.textContent='Remove Score';
+  removeBtn.addEventListener('click', ()=>{
+    if(!confirm('Remove this score permanently?')) return;
+    deleteScore(entry.date);
+    overlay.remove();
+  });
+  btnRow.appendChild(removeBtn);
+
+  const closeBtn = document.createElement('button'); closeBtn.className='btn close-btn'; closeBtn.textContent='Close';
+  closeBtn.addEventListener('click', ()=>{ modal.remove(); overlay.remove(); });
+  btnRow.appendChild(closeBtn);
+
+  modal.appendChild(btnRow);
+
+  const overlay = document.createElement('div'); overlay.style.position='fixed'; overlay.style.inset='0'; overlay.style.background='rgba(0,0,0,0.4)'; overlay.style.zIndex=10019; overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function drawHistogram(canvas, rts){
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const bins = 8;
+  const maxMs = MAX_RT;
+  const counts = new Array(bins).fill(0);
+  rts.forEach(v=>{ const c = Math.min(bins-1, Math.floor((Math.max(0,v)/maxMs)*bins)); counts[c]++; });
+  const maxCount = Math.max(1, ...counts);
+  const pad = 8;
+  const w = canvas.width - pad*2;
+  const h = canvas.height - pad*2;
+  const barW = Math.floor(w / bins) - 6;
+  for(let i=0;i<bins;i++){
+    const cx = pad + i*(w/bins) + 4;
+    const barH = Math.round((counts[i]/maxCount) * (h));
+    const x = cx;
+    const y = pad + (h - barH);
+    // color by bin center ms
+    const centerMs = ( (i + 0.5) / bins ) * maxMs;
+    ctx.fillStyle = getReactionColor(centerMs);
+    ctx.fillRect(x, y, barW, barH);
+    // draw small label
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '11px monospace';
+    const lbl = Math.round((i/bins)*maxMs);
+    ctx.fillText(lbl + 'ms', x, canvas.height - 4);
+  }
+}
+
+// --- grid / spawn / render ---
+function createGrid(){
+  gridEl.innerHTML = '';
+  gridEl.style.gridTemplateColumns = `repeat(${gridSize}, var(--cell-size))`;
+  const total = gridSize*gridSize;
+  for(let i=0;i<total;i++){
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.index = i;
+    cell.addEventListener('click', ()=> onCellClick(i));
+    gridEl.appendChild(cell);
+  }
+}
+
+function spawnCircles(){
+  clearAllTimers();
+  activeCells = [];
+  spawnTimes = {};
+  const total = gridSize*gridSize;
+  const maxActive = Math.max(1, Math.min(activeCount, total));
+  while(activeCells.length < maxActive){
+    const rand = Math.floor(Math.random()*total);
+    if(!activeCells.includes(rand)){
+      activeCells.push(rand);
+      spawnTimes[rand] = Date.now();
+    }
+  }
+  // record event
+  if(isRecording && recordStart) gameEvents.push({ t: Date.now() - recordStart, type: 'set', active: activeCells.slice() });
+  renderGrid();
+}
+
+function onCellClick(index){
+  if(!gameRunning || gameOver) return;
+  totalClicks++;
+  const relTime = isRecording && recordStart ? (Date.now() - recordStart) : null;
+  if(activeCells.includes(index)){
+    // hit
+    // compute reaction time
+    const reaction = Date.now() - (spawnTimes[index] || Date.now());
+    // store reaction (we always record; toggle only hides the visual)
+    reactionTimes.push(reaction);
+    updateAvgRTDisplay();
+
+    // record click and replacement event
+    if(isRecording && relTime !== null){
+      clickEvents.push({ t: relTime, index: index, hit: true });
+    }
+
+    hits++; score++; combo++; maxCombo = Math.max(maxCombo, combo);
+    popSound.currentTime = 0; popSound.play();
+    hp = clamp(hp + 5, 0, 100);
+
+    // show visual if enabled (and never interfere with click because pointer-events:none)
+    try{
+      const cellEl = document.querySelector(`.cell[data-index=\"${index}\"]`);
+      if(reactionToggle && reactionToggle.checked && cellEl){
+        showReactionFloatAtCell(cellEl, reaction);
+      }
+    }catch(e){ /* ignore */ }
+
+    // clear timers for the old index before replacing
+    clearTimersForIndex(index);
+
+    // replace this circle with a new one
+    const total = gridSize*gridSize;
+    let newIndex;
+    do { newIndex = Math.floor(Math.random()*total); } while(activeCells.includes(newIndex) || newIndex === index);
+
+    // record replacement event
+    if(isRecording && relTime !== null){
+      gameEvents.push({ t: relTime, type: 'replace', oldIndex: index, newIndex: newIndex });
+    }
+
+    // swap and update spawnTimes
+    activeCells[ activeCells.indexOf(index) ] = newIndex;
+    spawnTimes[newIndex] = Date.now();
+    // remove old spawn time reference to keep data clean
+    try{ delete spawnTimes[index]; }catch(e){}
+
+    // render only affected cells (old index removed, newIndex added)
+    renderGrid(index, newIndex);
+  } else {
+    // miss
+    if(isRecording && relTime !== null) clickEvents.push({ t: relTime, index: index, hit: false });
+
+    misses++;
+    if(combo >= 20){ comboBreakSound.currentTime = 0; comboBreakSound.play(); }
+    combo = 0;
+    // SD mode: one miss = fail
+    if(mode === 'sd'){
+      endGame();
+      return;
+    }
+    hp -= 10;
+  }
+
+  updateStats();
+  updateHP();
+  if(hp <= 0) endGame();
+}
+
+function renderGrid(clickedIndex = null, newIndex = null){
+  const cells = document.querySelectorAll('.cell');
+  const now = Date.now();
+  const hd = hdModeCheckbox.checked;
+  const fadeTime = Math.max(0, parseInt(fadeTimeInput.value,10)||0);
+  const visibleTime = Math.max(0, parseInt(visibleTimeInput.value,10)||0);
+
+  // remove nodes for indices that are no longer active
+  cells.forEach((cell, i)=>{
+    if(!activeCells.includes(i)){
+      // clean timers
+      clearTimersForIndex(i);
+      cell.innerHTML = '';
+    }
+  });
+
+  // add/update active circles
+  activeCells.forEach(i => {
+    const cell = cells[i];
+    if(!cell) return; // safety
+    let circle = cell.querySelector('.circle');
+    if(!circle){
+      circle = document.createElement('div');
+      circle.className = 'circle';
+      cell.appendChild(circle);
+    }
+
+    // compute how long since spawn
+    const spawn = spawnTimes[i] || (spawnTimes[i] = Date.now());
+    const elapsed = now - spawn;
+
+    // clear any previous timers for this index (we'll reschedule if needed)
+    clearTimersForIndex(i);
+
+    if(hd){
+      if(elapsed < visibleTime){
+        // still visible
+        circle.style.opacity = '1';
+        // schedule start of fade after remaining visible time
+        const timeUntilFade = visibleTime - elapsed;
+        visibleTimers[i] = setTimeout(()=>{
+          // start CSS transition to opacity 0
+          circle.style.transition = `opacity ${fadeTime}ms linear`;
+          circle.style.opacity = '0';
+        }, timeUntilFade);
+      } else {
+        // already past visible window -> either in fade or fully hidden
+        if(fadeTime <= 0){
+          circle.style.opacity = '0';
+        } else {
+          const fadeElapsed = elapsed - visibleTime;
+          if(fadeElapsed >= fadeTime){
+            circle.style.opacity = '0';
+          } else {
+            const currentOpacity = Math.max(0, 1 - (fadeElapsed / fadeTime));
+            circle.style.transition = '';
+            circle.style.opacity = String(currentOpacity);
+            // schedule finishing fade (optional)
+            visibleTimers[i] = setTimeout(()=>{
+              circle.style.transition = `opacity ${fadeTime}ms linear`;
+              circle.style.opacity = '0';
+            }, fadeTime - fadeElapsed);
+          }
+        }
+      }
+    } else {
+      // HD disabled -> always visible
+      circle.style.transition = '';
+      circle.style.opacity = '1';
+    }
+
+  });
+}
+
+// --- stats / HP / end ---
+function updateStats(){
+  scoreEl.textContent = score;
+  hitsEl.textContent = hits;
+  missesEl.textContent = misses;
+  comboEl.textContent = combo;
+  const total = hits + misses;
+  const acc = total === 0 ? 100 : (hits / total * 100);
+  accEl.textContent = acc.toFixed(1) + '%';
+}
+
+function updateHP(){
+  hp = clamp(hp, 0, 100);
+  hpFill.style.width = hp + '%';
+  if(hp > 60) hpFill.style.background = 'linear-gradient(90deg,#6bff87,#1fbf4c)';
+  else if(hp > 30) hpFill.style.background = 'orange';
+  else hpFill.style.background = 'red';
+}
+
+function updateTimeDisplay(){
+  if(mode === 'timed'){
+    timeDisplay.textContent = remainingTime + 's';
+  } else if(mode === 'sd'){
+    timeDisplay.textContent = 'SD';
+  } else {
+    timeDisplay.textContent = '∞';
+  }
+}
+
+function saveScore(obj){
+  const key = 'gridshot_leaderboard_v2';
+  const list = JSON.parse(localStorage.getItem(key) || '[]');
+  // ensure reactionTimes saved if provided
+  const toSave = Object.assign({date: Date.now(), reactionTimes: [], replay: { mouse: [], events: [], clicks: [] }}, obj);
+  list.push(toSave);
+  list.sort((a,b)=>b.score - a.score);
+  localStorage.setItem(key, JSON.stringify(list.slice(0,20)));
+  // update panel content so if user opens it it's fresh
+  renderLeaderboardList();
+}
+
+function endGame(){
+  if(gameOver) return;
+  gameOver = true;
+  gameRunning = false;
+  clearAllTimers();
+  clearInterval(timerInterval);
+  finalText.textContent = 'Game Over';
+  const total = hits + misses;
+  const acc = total === 0 ? 100 : (hits/total*100).toFixed(1);
+  const avg = getAvgRT();
+  finalStats.textContent = `Score: ${score} — Hits: ${hits} — Misses: ${misses} — Accuracy: ${acc}% — Max Combo: ${maxCombo} — Mode: ${mode} — Avg RT: ${avg !== null ? Math.round(avg) + 'ms' : '—'}`;
+
+  // Save run with reaction times snapshot and replay
+  saveScore({score, hits, misses, accuracy: acc, maxCombo, mode, duration: mode==='timed'? modeTime : null, avgRT: avg, reactionTimes: reactionTimes.slice(), replay: { mouse: mouseReplay.slice(), events: gameEvents.slice(), clicks: clickEvents.slice() } });
+
+  // stop recording
+  isRecording = false;
+
+  // populate result details (nicer layout)
+  finalDetails.innerHTML = `
+    <div style=\"display:flex;gap:12px;align-items:center;\"> 
+      <div style=\"flex:1\"><div class=\"result-score\">${score}</div><div style=\"color:var(--muted)\">Score</div></div>
+      <div style=\"flex:1\"> 
+        <div><strong>Hits:</strong> ${hits}</div>
+        <div><strong>Misses:</strong> ${misses}</div>
+        <div><strong>Accuracy:</strong> ${acc}%</div>
+      </div>
+    </div>
+    <div style=\"margin-top:8px;color:var(--muted)\">Max Combo: ${maxCombo} • Mode: ${mode} • Avg RT: ${avg !== null ? Math.round(avg) + 'ms' : '—'}</div>
+  `;
+
+  // show overlay but do NOT auto-open leaderboard panel
+  resultScreen.style.display = 'flex';
+}
+
+function startGame(){
+  // apply current settings
+  mode = modeSelect.value;
+  modeTime = Math.max(5, parseInt(modeTimeInput.value,10) || 30);
+  remainingTime = modeTime;
+
+  // reset state
+  score = 0; hits = 0; misses = 0; combo = 0; totalClicks = 0; maxCombo = 0; hp = 100; gameOver = false; gameRunning = true;
+  reactionTimes = []; // reset reaction times for new run
+  // start replay recording
+  mouseReplay = [];
+  gameEvents = [];
+  clickEvents = [];
+  isRecording = true;
+  recordStart = Date.now();
+  lastRecordTime = 0;
+
+  clearAllTimers();
+  clearInterval(timerInterval);
+  createGrid();
+  spawnCircles();
+  updateStats();
+  updateHP();
+  updateTimeDisplay();
+  updateAvgRTDisplay();
+
+  if(mode === 'timed'){
+    timerInterval = setInterval(()=>{
+      remainingTime--;
+      updateTimeDisplay();
+      if(remainingTime <= 0) endGame();
+    }, 1000);
+  }
+}
+
+function stopGame(){
+  clearInterval(timerInterval);
+  gameRunning = false;
+  // stop recording
+  isRecording = false;
+}
+
+function restart(){
+  resultScreen.style.display = 'none';
+  startGame();
+}
+
+function showLeaderboardPanel(){ toggleLeaderboardPanel(true); }
+
+// replay playback
+function playReplay(replay){
+  if(!replay || (!replay.mouse && !replay.events && !replay.clicks)){ alert('No replay data for this run.'); return; }
+
+// hide only the elements that should be hidden during replay (keep .topbar and .stats visible)
+const uiNodes = [ leaderboardBtn, lbPanel, resultScreen ];
+const uiDisplay = uiNodes.map(n => n ? n.style.display || '' : '');
+uiNodes.forEach(n => { if(n) n.style.display = 'none'; });
+
+
+  // backup grid DOM and disable original game interactions
+  const gridBackup = gridEl.innerHTML;
+  const cellElems = Array.from(document.querySelectorAll('.cell'));
+  // ensure grid exists for size; if grid is empty, recreate it
+  if(!cellElems.length) createGrid();
+
+  // overlay to capture click to stop playback early
+  const overlay = document.createElement('div'); overlay.className = 'replay-overlay'; overlay.style.background = 'rgba(0,0,0,0.0)';
+  document.body.appendChild(overlay);
+
+  // create dot for mouse path
+  const dot = document.createElement('div'); dot.className = 'replay-dot';
+  document.body.appendChild(dot);
+
+  // helper to add/remove circles directly (replay-only)
+  function setActiveIndices(indices){
+    const total = gridSize*gridSize;
+    for(let i=0;i<total;i++){
+      const cell = document.querySelector(`.cell[data-index=\"${i}\"]`);
+      if(!cell) continue;
+      if(indices.includes(i)){
+        if(!cell.querySelector('.circle')){
+          const c = document.createElement('div'); c.className = 'circle'; cell.appendChild(c);
+        }
+      } else {
+        const c = cell.querySelector('.circle'); if(c) c.remove();
+      }
+    }
+  }
+
+  // schedule all event timers
+  const timers = [];
+
+  // schedule events (spawns/replaces)
+  if(replay.events && replay.events.length){
+    replay.events.forEach(ev => {
+      const t = ev.t || 0;
+      const timer = setTimeout(()=>{
+        if(ev.type === 'set'){
+          setActiveIndices(ev.active || []);
+        } else if(ev.type === 'replace'){
+          // remove old and add new
+          const oldCell = document.querySelector(`.cell[data-index=\"${ev.oldIndex}\"]`);
+          if(oldCell){ const c = oldCell.querySelector('.circle'); if(c) c.remove(); }
+          const newCell = document.querySelector(`.cell[data-index=\"${ev.newIndex}\"]`);
+          if(newCell && !newCell.querySelector('.circle')){ const c2 = document.createElement('div'); c2.className='circle'; newCell.appendChild(c2); }
+        }
+      }, t);
+      timers.push(timer);
+    });
+  }
+
+  // schedule mouse movement
+  let lastPos = null;
+  if(replay.mouse && replay.mouse.length){
+    replay.mouse.forEach(pt => {
+      const timer = setTimeout(()=>{
+        dot.style.left = pt.x + 'px';
+        dot.style.top = pt.y + 'px';
+        lastPos = pt;
+      }, pt.t);
+      timers.push(timer);
+    });
+  }
+
+  // schedule clicks: show click animation and play sounds
+  if(replay.clicks && replay.clicks.length){
+    replay.clicks.forEach(cl => {
+      const timer = setTimeout(()=>{
+        // find nearest mouse point to get position; fallback to cell center
+        let px = null, py = null;
+        if(replay.mouse && replay.mouse.length){
+          // binary search nearest t
+          let idx = 0; while(idx+1 < replay.mouse.length && replay.mouse[idx].t < cl.t) idx++;
+          px = replay.mouse[idx] ? replay.mouse[idx].x : null;
+          py = replay.mouse[idx] ? replay.mouse[idx].y : null;
+        }
+        if(px === null){
+          const cell = document.querySelector(`.cell[data-index=\"${cl.index}\"]`);
+          if(cell){ const rect = cell.getBoundingClientRect(); px = rect.left + rect.width/2; py = rect.top + rect.height/2; }
+        }
+        if(px !== null){
+          const ring = document.createElement('div'); ring.className='replay-click'; ring.style.left = px + 'px'; ring.style.top = py + 'px'; document.body.appendChild(ring);
+          setTimeout(()=>{ try{ ring.remove(); }catch(e){} }, 700);
+        }
+
+        // play sound
+        if(cl.hit){ try{ popSound.currentTime = 0; popSound.play(); }catch(e){} }
+        else { try{ comboBreakSound.currentTime = 0; comboBreakSound.play(); }catch(e){} }
+      }, cl.t);
+      timers.push(timer);
+    });
+  }
+
+  // cleanup after last timestamp
+  const endT = Math.max(
+    replay.mouse && replay.mouse.length ? replay.mouse[replay.mouse.length-1].t : 0,
+    replay.events && replay.events.length ? replay.events[replay.events.length-1].t : 0,
+    replay.clicks && replay.clicks.length ? replay.clicks[replay.clicks.length-1].t : 0
+  );
+  const endTimer = setTimeout(()=>{
+    timers.forEach(clearTimeout);
+    // restore UI
+    uiNodes.forEach((n,i) => { if(n) n.style.display = uiDisplay[i] || ''; });
+    // restore grid
+    try{ gridEl.innerHTML = gridBackup; }catch(e){}
+    try{ dot.remove(); }catch(e){}
+    try{ overlay.remove(); }catch(e){}
+  }, endT + 800);
+
+  // allow click to stop early and cleanup
+  overlay.addEventListener('click', ()=>{
+    timers.forEach(clearTimeout);
+    clearTimeout(endTimer);
+    uiNodes.forEach((n,i) => { if(n) n.style.display = uiDisplay[i] || ''; });
+    try{ gridEl.innerHTML = gridBackup; }catch(e){}
+    try{ dot.remove(); }catch(e){}
+    try{ overlay.remove(); }catch(e){}
+  });
+}
+
+// --- UI events ---
+applyBtn.addEventListener('click', ()=>{
+  gridSize = Math.max(2, Math.min(12, parseInt(gridSizeSelect.value,10) || 3));
+  activeCount = Math.max(1, Math.min(parseInt(activeCountInput.value,10) || 3, gridSize*gridSize));
+  // reset stats but don't start run unless desired
+  score = 0; hits = 0; misses = 0; combo = 0; totalClicks = 0; hp = 100; gameOver = false; gameRunning = false;
+  reactionTimes = [];
+  mouseReplay = [];
+  isRecording = false;
+  clearAllTimers();
+  clearInterval(timerInterval);
+  createGrid();
+  spawnCircles();
+  updateStats();
+  updateHP();
+  updateTimeDisplay();
+  updateAvgRTDisplay();
+});
+
+startBtn.addEventListener('click', startGame);
+stopBtn.addEventListener('click', ()=>{ stopGame(); resultScreen.style.display = 'flex'; finalText.textContent = 'Stopped'; const avg=getAvgRT(); finalStats.textContent = `Score: ${score} — Hits: ${hits} — Misses: ${misses} — Max Combo: ${maxCombo} — Mode: ${mode} — Avg RT: ${avg !== null ? Math.round(avg) + 'ms' : '—'}`; saveScore({score,hits,misses,accuracy: (hits + misses ? (hits/(hits+misses)*100).toFixed(1) : 100), maxCombo, mode, duration: mode==='timed'?modeTime:null, avgRT: avg, reactionTimes: reactionTimes.slice(), replay: { mouse: mouseReplay.slice(), events: gameEvents.slice(), clicks: clickEvents.slice() } }); renderLeaderboardList();});
+
+respawnBtn?.addEventListener('click', ()=>{ if(!gameRunning) spawnCircles(); else {clearAllTimers(); spawnCircles();}});
+resetStatsBtn?.addEventListener('click', ()=>{ score = 0; hits = 0; misses = 0; combo = 0; totalClicks = 0; maxCombo = 0; hp = 100; reactionTimes = []; mouseReplay = []; gameEvents = []; clickEvents = []; isRecording = false; updateStats(); updateHP(); updateAvgRTDisplay(); });
+restartBtn.addEventListener('click', restart);
+viewLeaderboardBtn.addEventListener('click', ()=>{ toggleLeaderboardPanel(true); });
+leaderboardBtn.addEventListener('click', ()=>{ toggleLeaderboardPanel(); });
+
+// enable/disable time input depending on mode
+modeSelect.addEventListener('change', ()=>{
+  if(modeSelect.value === 'timed') modeTimeInput.disabled = false; else modeTimeInput.disabled = true;
+});
+modeTimeInput.disabled = (modeSelect.value !== 'timed');
+
+// keyboard: A/S acts on hovered cell (same behaviour you had)
+document.addEventListener('keydown', e=>{ if(!e.key) return; const k = e.key.toLowerCase(); if(k==='a'||k==='s'){ if(gameOver || !gameRunning) return; const hovered = [...document.querySelectorAll('.cell')].find(c=>c.matches(':hover')); if(hovered) onCellClick(parseInt(hovered.dataset.index,10)); } });
+
+// initial setup
+createGrid();
+spawnCircles();
+updateStats();
+updateHP();
+updateTimeDisplay();
+updateAvgRTDisplay();
+renderLeaderboardList();
+
+// expose for debug
+window.spawnCircles = spawnCircles;
+window.startGame = startGame;
+window.endGame = endGame;
+</script>
+</body>
+</html>
